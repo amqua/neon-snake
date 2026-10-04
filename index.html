@@ -1,0 +1,687 @@
+import pygame
+import random
+import math
+import sys
+
+# ==============================
+# KHỞI TẠO
+# ==============================
+pygame.init()
+
+WIDTH = 900
+HEIGHT = 650
+CELL = 25
+
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("NEON SNAKE")
+
+clock = pygame.time.Clock()
+
+# ==============================
+# MÀU
+# ==============================
+BG = (8, 10, 20)
+GRID = (18, 24, 40)
+WHITE = (240, 245, 255)
+CYAN = (0, 255, 220)
+GREEN = (50, 255, 120)
+BLUE = (70, 150, 255)
+PINK = (255, 60, 180)
+RED = (255, 60, 80)
+YELLOW = (255, 220, 60)
+PURPLE = (180, 80, 255)
+
+# ==============================
+# FONT
+# ==============================
+font_big = pygame.font.SysFont("Arial", 70, bold=True)
+font_title = pygame.font.SysFont("Arial", 45, bold=True)
+font = pygame.font.SysFont("Arial", 28, bold=True)
+font_small = pygame.font.SysFont("Arial", 20)
+
+# ==============================
+# HIGH SCORE
+# ==============================
+high_score = 0
+
+# ==============================
+# PARTICLES
+# ==============================
+particles = []
+
+
+def create_particles(x, y):
+    for _ in range(18):
+        angle = random.uniform(0, math.pi * 2)
+        speed = random.uniform(1, 5)
+
+        particles.append({
+            "x": x,
+            "y": y,
+            "vx": math.cos(angle) * speed,
+            "vy": math.sin(angle) * speed,
+            "life": 35
+        })
+
+
+def update_particles():
+    for particle in particles[:]:
+
+        particle["x"] += particle["vx"]
+        particle["y"] += particle["vy"]
+        particle["life"] -= 1
+
+        if particle["life"] <= 0:
+            particles.remove(particle)
+
+
+def draw_particles():
+
+    for p in particles:
+
+        radius = max(1, p["life"] // 5)
+
+        pygame.draw.circle(
+            screen,
+            CYAN,
+            (int(p["x"]), int(p["y"])),
+            radius
+        )
+
+
+# ==============================
+# TEXT
+# ==============================
+def text_center(text, font_type, color, y):
+
+    image = font_type.render(text, True, color)
+
+    x = WIDTH // 2 - image.get_width() // 2
+
+    screen.blit(image, (x, y))
+
+
+# ==============================
+# NÚT
+# ==============================
+def draw_button(rect, text, color):
+
+    pygame.draw.rect(
+        screen,
+        (15, 20, 35),
+        rect,
+        border_radius=12
+    )
+
+    pygame.draw.rect(
+        screen,
+        color,
+        rect,
+        2,
+        border_radius=12
+    )
+
+    image = font.render(text, True, color)
+
+    screen.blit(
+        image,
+        (
+            rect.centerx - image.get_width() // 2,
+            rect.centery - image.get_height() // 2
+        )
+    )
+
+
+# ==============================
+# MENU
+# ==============================
+def menu():
+
+    while True:
+
+        screen.fill(BG)
+
+        # Tiêu đề
+        text_center(
+            "NEON SNAKE",
+            font_big,
+            CYAN,
+            100
+        )
+
+        text_center(
+            "Classic Snake • Neon Edition",
+            font_small,
+            WHITE,
+            180
+        )
+
+        start_button = pygame.Rect(
+            WIDTH // 2 - 150,
+            260,
+            300,
+            65
+        )
+
+        quit_button = pygame.Rect(
+            WIDTH // 2 - 150,
+            345,
+            300,
+            65
+        )
+
+        draw_button(
+            start_button,
+            "START GAME",
+            GREEN
+        )
+
+        draw_button(
+            quit_button,
+            "QUIT",
+            RED
+        )
+
+        text_center(
+            "WASD / Arrow Keys to move",
+            font_small,
+            BLUE,
+            450
+        )
+
+        text_center(
+            f"BEST SCORE: {high_score}",
+            font_small,
+            YELLOW,
+            485
+        )
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_RETURN:
+                    return
+
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+
+                if start_button.collidepoint(event.pos):
+                    return
+
+                if quit_button.collidepoint(event.pos):
+                    pygame.quit()
+                    sys.exit()
+
+        clock.tick(60)
+
+
+# ==============================
+# TẠO FOOD
+# ==============================
+def create_food(snake):
+
+    while True:
+
+        x = random.randrange(
+            CELL,
+            WIDTH - CELL,
+            CELL
+        )
+
+        y = random.randrange(
+            75,
+            HEIGHT - CELL,
+            CELL
+        )
+
+        if (x, y) not in snake:
+            return (x, y)
+
+
+# ==============================
+# VẼ LƯỚI
+# ==============================
+def draw_grid():
+
+    for x in range(0, WIDTH, CELL):
+
+        pygame.draw.line(
+            screen,
+            GRID,
+            (x, 75),
+            (x, HEIGHT)
+        )
+
+    for y in range(75, HEIGHT, CELL):
+
+        pygame.draw.line(
+            screen,
+            GRID,
+            (0, y),
+            (WIDTH, y)
+        )
+
+
+# ==============================
+# VẼ FOOD
+# ==============================
+def draw_food(food):
+
+    x = food[0] + CELL // 2
+    y = food[1] + CELL // 2
+
+    # Glow
+    for radius in range(20, 5, -4):
+
+        alpha_surface = pygame.Surface(
+            (radius * 2, radius * 2),
+            pygame.SRCALPHA
+        )
+
+        alpha = max(10, 80 - radius * 3)
+
+        pygame.draw.circle(
+            alpha_surface,
+            (255, 50, 100, alpha),
+            (radius, radius),
+            radius
+        )
+
+        screen.blit(
+            alpha_surface,
+            (x - radius, y - radius)
+        )
+
+    # Food
+    pygame.draw.circle(
+        screen,
+        RED,
+        (x, y),
+        9
+    )
+
+    pygame.draw.circle(
+        screen,
+        WHITE,
+        (x - 3, y - 3),
+        3
+    )
+
+
+# ==============================
+# VẼ SNAKE
+# ==============================
+def draw_snake(snake):
+
+    for i, part in enumerate(snake):
+
+        x, y = part
+
+        if i == 0:
+            color = CYAN
+        else:
+            # Đuôi đổi màu
+            ratio = i / max(1, len(snake))
+
+            r = int(20 + 30 * ratio)
+            g = int(255 - 100 * ratio)
+            b = int(220 - 100 * ratio)
+
+            color = (r, g, b)
+
+        rect = pygame.Rect(
+            x + 2,
+            y + 2,
+            CELL - 4,
+            CELL - 4
+        )
+
+        pygame.draw.rect(
+            screen,
+            color,
+            rect,
+            border_radius=7
+        )
+
+        # Highlight
+        pygame.draw.rect(
+            screen,
+            WHITE,
+            (
+                x + 5,
+                y + 5,
+                5,
+                5
+            ),
+            border_radius=2
+        )
+
+    # Mắt
+    head_x, head_y = snake[0]
+
+    pygame.draw.circle(
+        screen,
+        WHITE,
+        (head_x + 8, head_y + 9),
+        3
+    )
+
+    pygame.draw.circle(
+        screen,
+        WHITE,
+        (head_x + 17, head_y + 9),
+        3
+    )
+
+
+# ==============================
+# GAME
+# ==============================
+def game():
+
+    global high_score
+
+    snake = [
+        (400, 300),
+        (375, 300),
+        (350, 300)
+    ]
+
+    direction = (CELL, 0)
+    next_direction = direction
+
+    food = create_food(snake)
+
+    score = 0
+    speed = 9
+
+    paused = False
+
+    while True:
+
+        # ==========================
+        # EVENTS
+        # ==========================
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+
+                # Pause
+                if event.key == pygame.K_SPACE:
+                    paused = not paused
+
+                if event.key == pygame.K_ESCAPE:
+                    return
+
+                if not paused:
+
+                    if (
+                        event.key in (pygame.K_UP, pygame.K_w)
+                        and direction != (0, CELL)
+                    ):
+                        next_direction = (0, -CELL)
+
+                    elif (
+                        event.key in (pygame.K_DOWN, pygame.K_s)
+                        and direction != (0, -CELL)
+                    ):
+                        next_direction = (0, CELL)
+
+                    elif (
+                        event.key in (pygame.K_LEFT, pygame.K_a)
+                        and direction != (CELL, 0)
+                    ):
+                        next_direction = (-CELL, 0)
+
+                    elif (
+                        event.key in (pygame.K_RIGHT, pygame.K_d)
+                        and direction != (-CELL, 0)
+                    ):
+                        next_direction = (CELL, 0)
+
+        # ==========================
+        # GAME UPDATE
+        # ==========================
+        if not paused:
+
+            direction = next_direction
+
+            head_x, head_y = snake[0]
+
+            new_head = (
+                head_x + direction[0],
+                head_y + direction[1]
+            )
+
+            # Đụng tường
+            if (
+                new_head[0] < 0
+                or new_head[0] >= WIDTH
+                or new_head[1] < 75
+                or new_head[1] >= HEIGHT
+            ):
+                break
+
+            # Đụng thân
+            if new_head in snake:
+                break
+
+            snake.insert(0, new_head)
+
+            # Ăn food
+            if new_head == food:
+
+                score += 1
+
+                if score > high_score:
+                    high_score = score
+
+                create_particles(
+                    food[0] + CELL // 2,
+                    food[1] + CELL // 2
+                )
+
+                food = create_food(snake)
+
+                # Tăng tốc
+                speed = min(
+                    25,
+                    9 + score // 2
+                )
+
+            else:
+                snake.pop()
+
+        # ==========================
+        # VẼ
+        # ==========================
+        screen.fill(BG)
+
+        draw_grid()
+
+        # Thanh trên
+        pygame.draw.rect(
+            screen,
+            (12, 17, 30),
+            (0, 0, WIDTH, 75)
+        )
+
+        pygame.draw.line(
+            screen,
+            CYAN,
+            (0, 74),
+            (WIDTH, 74),
+            2
+        )
+
+        # Score
+        score_text = font.render(
+            f"SCORE  {score}",
+            True,
+            YELLOW
+        )
+
+        screen.blit(
+            score_text,
+            (20, 22)
+        )
+
+        # High score
+        best_text = font_small.render(
+            f"BEST  {high_score}",
+            True,
+            PURPLE
+        )
+
+        screen.blit(
+            best_text,
+            (WIDTH - 140, 28)
+        )
+
+        # Food
+        draw_food(food)
+
+        # Snake
+        draw_snake(snake)
+
+        # Particles
+        update_particles()
+        draw_particles()
+
+        # Pause
+        if paused:
+
+            overlay = pygame.Surface(
+                (WIDTH, HEIGHT),
+                pygame.SRCALPHA
+            )
+
+            overlay.fill(
+                (0, 0, 0, 150)
+            )
+
+            screen.blit(
+                overlay,
+                (0, 0)
+            )
+
+            text_center(
+                "PAUSED",
+                font_big,
+                CYAN,
+                250
+            )
+
+            text_center(
+                "Press SPACE to continue",
+                font,
+                WHITE,
+                340
+            )
+
+        pygame.display.flip()
+
+        clock.tick(speed)
+
+    return score
+
+
+# ==============================
+# GAME OVER
+# ==============================
+def game_over(score):
+
+    while True:
+
+        screen.fill((8, 5, 18))
+
+        text_center(
+            "GAME OVER",
+            font_big,
+            RED,
+            130
+        )
+
+        text_center(
+            f"SCORE: {score}",
+            font_title,
+            YELLOW,
+            230
+        )
+
+        text_center(
+            f"BEST: {high_score}",
+            font,
+            PURPLE,
+            290
+        )
+
+        text_center(
+            "ENTER  →  PLAY AGAIN",
+            font,
+            GREEN,
+            380
+        )
+
+        text_center(
+            "ESC  →  MENU",
+            font_small,
+            WHITE,
+            435
+        )
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+
+                if event.key == pygame.K_RETURN:
+                    return "restart"
+
+                if event.key == pygame.K_ESCAPE:
+                    return "menu"
+
+        clock.tick(60)
+
+
+# ==============================
+# MAIN
+# ==============================
+while True:
+
+    menu()
+
+    while True:
+
+        result = game()
+
+        # ESC từ game → menu
+        if result is None:
+            break
+
+        result = game_over(result)
+
+        if result == "restart":
+            continue
+
+        if result == "menu":
+            break
